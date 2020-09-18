@@ -4,7 +4,9 @@ from .. import SamplingExplainer
 from .. import TreeExplainer
 from .. import DeepExplainer
 from .. import GradientExplainer
-from .. import kmeans
+from .. import PermutationExplainer
+from .. import Explainer
+from ..utils._legacy import kmeans
 from ..explainers import other
 from .models import KerasWrap
 import numpy as np
@@ -51,7 +53,27 @@ def tree_shap_tree_path_dependent(model, data):
     color = red_blue_circle(0)
     linestyle = solid
     """
-    return TreeExplainer(model, feature_dependence="tree_path_dependent").shap_values
+    return TreeExplainer(model, feature_dependence="feature_perturbation").shap_values
+
+def permutation_explainer(model, data):
+    """ TreeExplainer
+    color = red_blue_circle(0)
+    linestyle = solid
+    """
+    f = lambda x: model.predict(x, output_margin=True, validate_features=False)
+
+    explainer_permutation = Explainer(f, data, algorithm='permutation')
+    return lambda X: explainer_permutation(X).values
+
+def exact_explainer(model, data):
+    """ TreeExplainer
+    color = red_blue_circle(0)
+    linestyle = solid
+    """
+    f = lambda x: model.predict(x, output_margin=True, validate_features=False)
+
+    explainer_permutation = Explainer(f, data, algorithm='exact')
+    return lambda X: explainer_permutation(X).values
 
 def tree_shap_independent_200(model, data):
     """ TreeExplainer (independent)
