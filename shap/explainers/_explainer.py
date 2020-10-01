@@ -6,7 +6,7 @@ import numpy as np
 
 
 class Explainer():
-    def __init__(self, model, masker, link=links.identity, algorithm="auto", output_names=None):
+    def __init__(self, model, masker=None, link=links.identity, algorithm="auto", output_names=None):
         """ Uses Shapley values to explain any machine learning model or python function.
 
         This is the primary explainer interface for the SHAP library. It takes any combination
@@ -19,7 +19,7 @@ class Explainer():
             User supplied function or model object that takes a dataset of samples and
             computes the output of the model for those samples.
 
-        masker : function, numpy.array, pandas.DataFrame, tokenizer, or a list of these for each model input
+        masker : function, numpy.array, pandas.DataFrame, tokenizer, None, or a list of these for each model input
             The function used to "mask" out hidden features of the form `masked_args = masker(*model_args, mask=mask)`. 
             It takes input in the same form as the model, but for just a single sample with a binary
             mask, then returns an iterable of masked samples. These
@@ -91,11 +91,11 @@ class Explainer():
             if algorithm == "auto":
 
                 # use implementation-aware methods if possible
-                if explainers.Linear.supports_model(model):
+                if explainers.Linear.supports_model_with_masker(model, self.masker):
                     algorithm = "linear"
-                elif explainers.Tree.supports_model(model): # TODO: check for Partition?
+                elif explainers.Tree.supports_model_with_masker(model, self.masker): # TODO: check for Partition?
                     algorithm = "tree"
-                elif explainers.Additive.supports_model(model):
+                elif explainers.Additive.supports_model_with_masker(model, self.masker):
                     algorithm = "additive"
 
                 # otherwise use a model agnostic method
@@ -122,7 +122,7 @@ class Explainer():
                 
                 # if we get here then we don't know how to handle what was given to us
                 else:
-                    raise Exception("The passed model is not callable and is not any known model type: " + str(model))
+                    raise Exception("The passed model is not callable and cannot be analyzed directly with the given masker: " + str(model))
 
             # build the right subclass
             if algorithm == "exact":
@@ -251,8 +251,11 @@ class Explainer():
             #     clustering = clustering[0]
 
         # getting output labels 
-        labels = np.array(self.output_names)
-        sliced_labels = np.array([labels[index_list] for index_list in output_indices])
+        if self.output_names is None:
+            sliced_labels = None
+        else:
+            labels = np.array(self.output_names)
+            sliced_labels = np.array([labels[index_list] for index_list in output_indices])
 
         # build the explanation objects
         out = []
@@ -304,7 +307,7 @@ class Explainer():
         return {}
 
     @staticmethod
-    def supports_model(model):
+    def supports_model_with_masker(model, masker):
         """ Determines if this explainer can handle the given model.
 
         This is an abstract static method meant to be implemented by each subclass.
