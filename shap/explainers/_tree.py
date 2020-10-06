@@ -13,6 +13,7 @@ from ..utils._legacy import DenseData
 from .._explanation import Explanation
 from .. import maskers
 import warnings
+import pandas as pd
 
 warnings.formatwarning = lambda msg, *args, **kwargs: str(msg) + '\n' # ignore everything except the message
 
@@ -84,6 +85,10 @@ class Tree(Explainer):
 
 
     def __init__(self, model, data = None, model_output="raw", feature_perturbation="interventional", **deprecated_options):
+        
+        if safe_isinstance(data, "pandas.core.frame.DataFrame"):
+            self.data_feature_names = list(data.columns)
+        
         masker = data
         super(Tree, self).__init__(model, masker)
         self.name = 'tree explainer'
@@ -131,7 +136,7 @@ class Tree(Explainer):
         elif feature_perturbation == "interventional" and self.data.shape[0] > 1000:
                 warnings.warn("Passing "+str(self.data.shape[0]) + " background samples may lead to slow runtimes. Consider "
                     "using shap.sample(data, 100) to create a smaller background data set.")
-        self.data_missing = None if self.data is None else np.isnan(self.data)
+        self.data_missing = None if self.data is None else pd.isna(self.data)
         self.feature_perturbation = feature_perturbation
         self.expected_value = None
         self.model = TreeEnsemble(model, self.data, self.data_missing, model_output)
@@ -195,10 +200,10 @@ class Tree(Explainer):
             feature_names = list(X.columns)
             X = X.values
         else:
-            feature_names = None # we can make self.feature_names from background data eventually if we have it
+            feature_names = getattr(self, "data_feature_names", None)
         
         if not interactions:
-            v = self.shap_values(X, from_call=True, check_additivity=check_additivity)
+            v = self.shap_values(X, y=y, from_call=True, check_additivity=check_additivity)
             output_shape = tuple()
             if type(v) is list:
                 output_shape = (len(v),)
@@ -605,7 +610,7 @@ class TreeEnsemble:
         elif safe_isinstance(model, ["sklearn.ensemble.IsolationForest", "sklearn.ensemble.iforest.IsolationForest"]):
             self.dtype = np.float32
             scaling = 1.0 / len(model.estimators_) # output is average of trees
-            self.trees = [IsoTree(e.tree_, scaling=scaling, data=data, data_missing=data_missing) for e in model.estimators_]
+            self.trees = [IsoTree(e.tree_, f, scaling=scaling, data=data, data_missing=data_missing) for e, f in zip(model.estimators_, model.estimators_features_)]
             self.tree_output = "raw_value"
         elif safe_isinstance(model, "skopt.learning.forest.RandomForestRegressor"):
             assert hasattr(model, "estimators_"), "Model has no `estimators_`! Have you called `model.fit`?"
@@ -1337,7 +1342,7 @@ class IsoTree(SingleTree):
     """
     In sklearn the tree of the Isolation Forest does not calculated in a good way.
     """
-    def __init__(self, tree, normalize=False, scaling=1.0, data=None, data_missing=None):
+    def __init__(self, tree, tree_features, normalize=False, scaling=1.0, data=None, data_missing=None):
         super(IsoTree, self).__init__(tree, normalize, scaling, data, data_missing)
         if safe_isinstance(tree, "sklearn.tree._tree.Tree"):
             from sklearn.ensemble.iforest import _average_path_length # pylint: disable=no-name-in-module
@@ -1357,6 +1362,8 @@ class IsoTree(SingleTree):
             if normalize:
                 self.values = (self.values.T / self.values.sum(1)).T
             self.values = self.values * scaling
+            # re-number the features if each tree gets a different set of features
+            self.features = np.where(self.features >= 0, tree_features[self.features], self.features)
 
 
 def get_xgboost_json(model):
