@@ -69,7 +69,13 @@ class SequentialPerturbation():
         svals = []
 
         for i in range(len(X)):
-            mask = np.ones(len(X[i]), dtype=np.bool) * (self.perturbation == "remove")
+            if callable(self.masker):
+                mshape = self.masker.shape(X[i])[1]
+            else:
+                mshape = self.masker.shape
+
+
+            mask = np.ones(mshape, dtype=np.bool) * (self.perturbation == "remove")
             ordered_inds = self.sort_order_map(attributions[i])
             
             # compute the fully masked score
@@ -81,7 +87,7 @@ class SequentialPerturbation():
             # default curr_val to be fully masked score in case when entire attributions is negative/positive
             # avoid nan by setting default curr_val to full masked score
             curr_val = self.f(masked).mean(0)
-            for j in range(len(X[i])):
+            for j in range(mshape):
                 oind = ordered_inds[j]
                 
                 # keep masking our inputs until there are none more to mask
@@ -109,9 +115,10 @@ class SequentialPerturbation():
             curve_sign = 1
 
         svals = np.array(svals)
-        scores = [self.score_function(y, svals[:,i]) for i in range(svals.shape[1])]
-        auc = sklearn.metrics.auc(np.linspace(0, 1, len(scores)), curve_sign*(scores-scores[0]))
-        
+        #scores = [self.score_function(y, svals[:,i]) for i in range(svals.shape[1])]
+        #auc = sklearn.metrics.auc(np.linspace(0, 1, len(scores)), curve_sign*(scores-scores[0]))
+        auc = 0
+
         self.labels.append(label)
         
         xs = np.linspace(0, 1, 100)
@@ -121,6 +128,8 @@ class SequentialPerturbation():
             yp = self.score_values[-1][j]
             curves[j,:] = np.interp(xs, xp, yp)
         ys = curves.mean(0)
+
+        auc = sklearn.metrics.auc(np.linspace(0, 1, len(ys)), curve_sign*(ys-ys[0]))
         
         return xs, ys, auc
         
