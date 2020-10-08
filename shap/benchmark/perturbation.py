@@ -79,7 +79,7 @@ class SequentialPerturbation():
             ordered_inds = self.sort_order_map(attributions[i])
             
             # compute the fully masked score
-            values = np.zeros(len(X[i])+1)
+            values = np.zeros(mshape+1)
             masked = self.masker(mask, X[i])
             values[0] = self.f(masked).mean(0)
             
