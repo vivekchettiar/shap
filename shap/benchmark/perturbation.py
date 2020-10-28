@@ -44,7 +44,8 @@ class SequentialPerturbation():
         self.masked_model = MaskedModel(self.f, self.masker, shap.links.identity) 
     
     def score(self, explainer, X, y=None, label=None, silent=False):
-        # if explainer is already the attributions 
+        # if explainer is already the attributions
+        # TODO: I changed this for text input, but it breaks for tabular data, please check, should be simple fix
         if safe_isinstance(explainer, "numpy.ndarray"): 
             attributions = explainer 
         else: 
@@ -69,11 +70,17 @@ class SequentialPerturbation():
         svals = []
 
         for i in range(len(X)):
+
+            # TODO: Infering input length depends on data type, simplest is calling masker.shape (function or attribute)
+            # If masked does not have a shap funtion we can try to infer from attribution matrix (might get tricky for image data)
+
             if callable(self.masker):
                 mshape = self.masker.shape(X[i])[1]
             else:
                 mshape = self.masker.shape
 
+
+            # TODO: For image data, we need to sort (x,y,channel) indices by the corresponding shap values and mask/unmask
 
             mask = np.ones(mshape, dtype=np.bool) * (self.perturbation == "remove")
             ordered_inds = self.sort_order_map(attributions[i])
@@ -83,7 +90,8 @@ class SequentialPerturbation():
             masked = self.masker(mask, X[i])
             values[0] = self.f(masked).mean(0)
             
-            # loop over all the features
+            # TODO: For data sets with multiple outputs loop over the output samples and order based on corresponding attributions, 
+            # TODO: For this, need to experiment with micro average (average sub-sample values for every sample) or macro average  (collect all sub-sample values and average at the end)
             # default curr_val to be fully masked score in case when entire attributions is negative/positive
             # avoid nan by setting default curr_val to full masked score
             curr_val = self.f(masked).mean(0)
