@@ -1,10 +1,12 @@
 from .. import maskers
 from .. import links
-from ..utils import safe_isinstance, show_progress
+from ..utils import safe_isinstance, show_progress, Model
 from .._explanation import Explanation
 import numpy as np
 import scipy as sp
 import copy
+import pickle
+from .. import explainers
 
 
 class Explainer():
@@ -60,7 +62,7 @@ class Explainer():
             downstream plots.
         """
 
-        self.model = model
+        self.model = Model(model)
         self.output_names = output_names
         self.feature_names = feature_names
         
@@ -354,4 +356,14 @@ class Explainer():
         
         return expanded_main_effects
 
-        
+    def save(self, out_file):
+        """ Serializes the type of subclass of explainer used, this will be used during deserialization
+        """
+        pickle.dump(type(self), out_file)
+    
+    @classmethod
+    def load(cls, in_file, custom_model_loader = None, custom_masker_loader = None):
+        """ Deserializes the explainer subtype, and calls respective load function
+        """
+        explainer_type = pickle.load(in_file)
+        return explainer_type.load(in_file)
