@@ -19,3 +19,20 @@ def test_wrapping_for_text_to_text_teacher_forcing_logits_model():
     explainer = shap.Explainer(wrapped_model,masker)
 
     assert safe_isinstance(explainer.masker, "shap.maskers.FixedComposite")
+
+def test_auto_wrapping_for_text_to_text_teacher_forcing_logits_model():
+    from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+    import shap
+    from shap.utils import safe_isinstance
+    from shap.models import TeacherForcingLogits
+    from shap import maskers
+    
+    def f(x):
+        pass
+
+    tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-xsum-12-6")
+    model =  AutoModelForSeq2SeqLM.from_pretrained("sshleifer/distilbart-xsum-12-6")
+    
+    explainer = shap.Explainer(model,tokenizer)
+
+    assert safe_isinstance(explainer.masker, "shap.maskers.FixedComposite")
